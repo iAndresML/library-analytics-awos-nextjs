@@ -1,0 +1,49 @@
+name: library-analytics-awos
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: library_analytics_pg
+    environment:
+      - POSTGRES_USER=${DB_ADMIN_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_ADMIN_PASSWORD:-root_admin_unsecure_pass!}
+      - POSTGRES_DB=${DB_NAME:-library_db}
+    volumes:
+      - ./database/init:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    # Protección DDoS (Toque FASE EXTENDIDA)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: library_analytics_web
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://app_reporter:Secure_Reporter_P@ss@db:5432/${DB_NAME:-library_db}
+      - NODE_ENV=production
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 512M
+
+volumes:
+  pgdata:
